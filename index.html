@@ -5,146 +5,316 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Alarm</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+    :root {
+      --accent: #00d4ff;
+      --accent-dim: rgba(0, 212, 255, 0.12);
+      --bg: #070b10;
+      --card: rgba(255, 255, 255, 0.04);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #dff0ff;
+      --text-dim: rgba(223, 240, 255, 0.35);
+      --ring-r: 130;
+      --ring-size: 300px;
     }
 
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      background: #0f0f0f;
-      color: #f0f0f0;
-      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      gap: 48px;
+      gap: 44px;
+      overflow: hidden;
+    }
+
+    /* ambient glow blobs */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      filter: blur(80px);
+      opacity: 0.45;
+      transition: opacity 1s;
+    }
+    body::before {
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(0,212,255,0.18) 0%, transparent 70%);
+      top: -120px; left: -100px;
+    }
+    body::after {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(120,60,255,0.14) 0%, transparent 70%);
+      bottom: -100px; right: -80px;
+    }
+
+    /* ── Ring ── */
+    .ring-wrap {
+      position: relative;
+      width: var(--ring-size);
+      height: var(--ring-size);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ring-svg {
+      position: absolute;
+      inset: 0;
+      transform: rotate(-90deg);
+      overflow: visible;
+    }
+
+    .ring-track {
+      fill: none;
+      stroke: rgba(255,255,255,0.05);
+      stroke-width: 2.5;
+    }
+
+    .ring-progress {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-dasharray: 817;
+      stroke-dashoffset: 817;
+      transition: stroke-dashoffset 1s linear, stroke 0.6s ease;
+      filter: drop-shadow(0 0 5px var(--accent)) drop-shadow(0 0 12px rgba(0,212,255,0.4));
+    }
+
+    .ring-ticks {
+      fill: none;
+      stroke: rgba(255,255,255,0.06);
+      stroke-width: 1;
+    }
+
+    .clock-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      z-index: 1;
     }
 
     #clock {
-      font-size: clamp(64px, 14vw, 128px);
-      font-weight: 100;
+      font-size: 56px;
+      font-weight: 200;
       letter-spacing: 0.04em;
       font-variant-numeric: tabular-nums;
+      line-height: 1;
     }
 
+    #date-label {
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    /* ── Panel ── */
     .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 32px 36px;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 20px;
+      width: 300px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 24px 48px rgba(0,0,0,0.4);
+    }
+
+    .panel-eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--text-dim);
     }
 
     #time-input {
       background: none;
       border: none;
-      border-bottom: 1px solid #444;
-      color: #f0f0f0;
-      font-size: 40px;
+      color: var(--text);
+      font-size: 48px;
       font-weight: 200;
       text-align: center;
-      width: 200px;
-      padding: 4px 0;
+      width: 100%;
       outline: none;
-      transition: border-color 0.2s;
       font-variant-numeric: tabular-nums;
-    }
-
-    #time-input:focus {
-      border-bottom-color: #f0f0f0;
-    }
-
-    #time-input::-webkit-calendar-picker-indicator {
-      display: none;
-    }
-
-    #set-btn {
-      background: none;
-      border: 1px solid #444;
-      color: #f0f0f0;
-      font-size: 13px;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      padding: 10px 36px;
       cursor: pointer;
-      transition: background 0.2s, border-color 0.2s;
+      padding: 0;
     }
-
-    #set-btn:hover {
-      background: #f0f0f0;
-      color: #0f0f0f;
-      border-color: #f0f0f0;
-    }
-
-    #set-btn.active {
-      background: #f0f0f0;
-      color: #0f0f0f;
-      border-color: #f0f0f0;
-    }
+    #time-input::-webkit-calendar-picker-indicator { display: none; }
 
     #status {
-      font-size: 13px;
-      letter-spacing: 0.1em;
-      color: #666;
-      height: 20px;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      color: var(--text-dim);
+      min-height: 16px;
+      text-align: center;
     }
 
-    #status.ringing {
-      color: #f0f0f0;
-      animation: blink 0.6s step-end infinite;
+    .btn-row { display: flex; gap: 10px; width: 100%; }
+
+    .btn {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 13px 0;
+      cursor: pointer;
+      border-radius: 12px;
+      transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.16);
     }
 
+    .btn.primary {
+      background: var(--accent-dim);
+      border-color: rgba(0,212,255,0.4);
+      color: var(--accent);
+      box-shadow: 0 0 16px rgba(0,212,255,0.1);
+    }
+    .btn.primary:hover {
+      background: rgba(0,212,255,0.2);
+      box-shadow: 0 0 24px rgba(0,212,255,0.2);
+    }
+
+    .btn.danger {
+      background: rgba(255,60,80,0.1);
+      border-color: rgba(255,60,80,0.35);
+      color: #ff7a8a;
+    }
+    .btn.danger:hover {
+      background: rgba(255,60,80,0.18);
+    }
+
+    /* ── Ringing state ── */
+    body.ringing .ring-progress {
+      stroke: #ff3d5a;
+      filter: drop-shadow(0 0 8px #ff3d5a) drop-shadow(0 0 20px rgba(255,60,80,0.5));
+      animation: ring-pulse 0.8s ease-in-out infinite alternate;
+    }
+    body.ringing #clock {
+      animation: clock-pulse 0.8s ease-in-out infinite alternate;
+    }
+    body.ringing::before {
+      background: radial-gradient(circle, rgba(255,60,80,0.2) 0%, transparent 70%);
+    }
+
+    #status.ringing-label {
+      color: #ff8095;
+      letter-spacing: 0.3em;
+      animation: blink 0.8s step-end infinite;
+    }
+
+    @keyframes ring-pulse {
+      from { filter: drop-shadow(0 0 6px #ff3d5a) drop-shadow(0 0 14px rgba(255,60,80,0.4)); }
+      to   { filter: drop-shadow(0 0 14px #ff3d5a) drop-shadow(0 0 32px rgba(255,60,80,0.7)); }
+    }
+    @keyframes clock-pulse {
+      from { opacity: 1; }
+      to   { opacity: 0.45; }
+    }
     @keyframes blink {
       50% { opacity: 0; }
-    }
-
-    #dismiss-btn {
-      display: none;
-      background: none;
-      border: 1px solid #f0f0f0;
-      color: #f0f0f0;
-      font-size: 13px;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      padding: 10px 36px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    #dismiss-btn:hover {
-      background: #f0f0f0;
-      color: #0f0f0f;
     }
   </style>
 </head>
 <body>
 
-  <div id="clock">00:00:00</div>
+  <div class="ring-wrap">
+    <svg class="ring-svg" viewBox="0 0 300 300" width="300" height="300">
+      <!-- tick marks -->
+      <g id="ticks"></g>
+      <!-- track -->
+      <circle class="ring-track" cx="150" cy="150" r="130" />
+      <!-- progress -->
+      <circle class="ring-progress" id="ring" cx="150" cy="150" r="130" />
+    </svg>
+    <div class="clock-inner">
+      <div id="clock">00:00:00</div>
+      <div id="date-label">loading…</div>
+    </div>
+  </div>
 
   <div class="panel">
+    <div class="panel-eyebrow">Wake me at</div>
     <input type="time" id="time-input" value="07:00" step="60" />
-    <button id="set-btn">Set Alarm</button>
     <div id="status"></div>
-    <button id="dismiss-btn">Dismiss</button>
+    <div class="btn-row">
+      <button class="btn" id="set-btn">Set Alarm</button>
+      <button class="btn danger" id="dismiss-btn" style="display:none">Dismiss</button>
+    </div>
   </div>
 
   <script>
     const clockEl    = document.getElementById('clock');
+    const dateLabelEl= document.getElementById('date-label');
     const timeInput  = document.getElementById('time-input');
     const setBtn     = document.getElementById('set-btn');
     const statusEl   = document.getElementById('status');
     const dismissBtn = document.getElementById('dismiss-btn');
+    const ringEl     = document.getElementById('ring');
 
-    let alarmTime  = null;
-    let ringing    = false;
-    let audioCtx   = null;
-    let oscillator = null;
-    let gainNode   = null;
+    const R    = 130;
+    const CIRC = 2 * Math.PI * R; // ≈ 816.8
 
-    function pad(n) {
-      return String(n).padStart(2, '0');
+    let alarmTime = null;
+    let ringing   = false;
+    let audioCtx  = null;
+
+    const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    // draw 12 tick marks
+    (function buildTicks() {
+      const g = document.getElementById('ticks');
+      for (let i = 0; i < 60; i++) {
+        const angle = (i / 60) * 2 * Math.PI - Math.PI / 2;
+        const isMajor = i % 5 === 0;
+        const r1 = isMajor ? 118 : 122;
+        const r2 = 130;
+        const x1 = 150 + r1 * Math.cos(angle);
+        const y1 = 150 + r1 * Math.sin(angle);
+        const x2 = 150 + r2 * Math.cos(angle);
+        const y2 = 150 + r2 * Math.sin(angle);
+        const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('stroke', isMajor ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.05)');
+        line.setAttribute('stroke-width', isMajor ? '1.5' : '1');
+        g.appendChild(line);
+      }
+    })();
+
+    function pad(n) { return String(n).padStart(2,'0'); }
+
+    function updateRing(now) {
+      if (!alarmTime || ringing) {
+        ringEl.style.strokeDashoffset = CIRC;
+        return;
+      }
+      const [ah, am] = alarmTime.split(':').map(Number);
+      const totalMins = 1440;
+      const nowMins   = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+      const alarmMins = ah * 60 + am;
+      let diff = alarmMins - nowMins;
+      if (diff < 0) diff += totalMins;
+      const progress = 1 - diff / totalMins;
+      ringEl.style.strokeDashoffset = CIRC * (1 - progress);
     }
 
     function tick() {
@@ -152,62 +322,57 @@
       const h = pad(now.getHours());
       const m = pad(now.getMinutes());
       const s = pad(now.getSeconds());
-      clockEl.textContent = `${h}:${m}:${s}`;
+      clockEl.textContent    = `${h}:${m}:${s}`;
+      dateLabelEl.textContent = `${DAYS[now.getDay()]}  —  ${now.getFullYear()}.${pad(now.getMonth()+1)}.${pad(now.getDate())}`;
 
-      if (alarmTime && !ringing) {
-        const current = `${h}:${m}`;
-        if (current === alarmTime && now.getSeconds() === 0) {
-          triggerAlarm();
-        }
+      updateRing(now);
+
+      if (alarmTime && !ringing && `${h}:${m}` === alarmTime && now.getSeconds() === 0) {
+        triggerAlarm();
       }
     }
 
     function triggerAlarm() {
       ringing = true;
-      statusEl.textContent = 'ALARM';
-      statusEl.classList.add('ringing');
+      document.body.classList.add('ringing');
+      statusEl.textContent = '— ALARM —';
+      statusEl.className   = 'ringing-label';
       dismissBtn.style.display = 'block';
-      setBtn.style.display = 'none';
+      setBtn.style.display     = 'none';
       timeInput.disabled = true;
+      ringEl.style.strokeDashoffset = 0;
       startSound();
     }
 
     function startSound() {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      gainNode = audioCtx.createGain();
-      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gainNode.connect(audioCtx.destination);
-
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+      gain.connect(audioCtx.destination);
       function beep() {
         if (!ringing) return;
         const osc = audioCtx.createOscillator();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-        osc.connect(gainNode);
+        osc.connect(gain);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.2);
-        setTimeout(() => { if (ringing) beep(); }, 700);
+        osc.stop(audioCtx.currentTime + 0.18);
+        setTimeout(() => { if (ringing) beep(); }, 650);
       }
       beep();
-    }
-
-    function stopSound() {
-      if (audioCtx) {
-        audioCtx.close();
-        audioCtx = null;
-      }
     }
 
     function dismissAlarm() {
       ringing = false;
       alarmTime = null;
-      stopSound();
+      if (audioCtx) { audioCtx.close(); audioCtx = null; }
+      document.body.classList.remove('ringing');
       statusEl.textContent = '';
-      statusEl.classList.remove('ringing');
+      statusEl.className   = '';
       dismissBtn.style.display = 'none';
-      setBtn.style.display = 'block';
-      setBtn.textContent = 'Set Alarm';
-      setBtn.classList.remove('active');
+      setBtn.style.display     = 'block';
+      setBtn.textContent       = 'Set Alarm';
+      setBtn.classList.remove('primary');
       timeInput.disabled = false;
     }
 
@@ -215,15 +380,15 @@
       if (alarmTime) {
         alarmTime = null;
         setBtn.textContent = 'Set Alarm';
-        setBtn.classList.remove('active');
+        setBtn.classList.remove('primary');
         statusEl.textContent = '';
       } else {
         const val = timeInput.value;
         if (!val) return;
         alarmTime = val;
         setBtn.textContent = 'Cancel';
-        setBtn.classList.add('active');
-        statusEl.textContent = `Set for ${val}`;
+        setBtn.classList.add('primary');
+        statusEl.textContent = `Set for  ${val}`;
       }
     });
 
