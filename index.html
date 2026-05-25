@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alarm</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #0f0f0f;
+      color: #f0f0f0;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 48px;
+    }
+
+    #clock {
+      font-size: clamp(64px, 14vw, 128px);
+      font-weight: 100;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    #time-input {
+      background: none;
+      border: none;
+      border-bottom: 1px solid #444;
+      color: #f0f0f0;
+      font-size: 40px;
+      font-weight: 200;
+      text-align: center;
+      width: 200px;
+      padding: 4px 0;
+      outline: none;
+      transition: border-color 0.2s;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #time-input:focus {
+      border-bottom-color: #f0f0f0;
+    }
+
+    #time-input::-webkit-calendar-picker-indicator {
+      display: none;
+    }
+
+    #set-btn {
+      background: none;
+      border: 1px solid #444;
+      color: #f0f0f0;
+      font-size: 13px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 10px 36px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    #set-btn:hover {
+      background: #f0f0f0;
+      color: #0f0f0f;
+      border-color: #f0f0f0;
+    }
+
+    #set-btn.active {
+      background: #f0f0f0;
+      color: #0f0f0f;
+      border-color: #f0f0f0;
+    }
+
+    #status {
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      color: #666;
+      height: 20px;
+    }
+
+    #status.ringing {
+      color: #f0f0f0;
+      animation: blink 0.6s step-end infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    #dismiss-btn {
+      display: none;
+      background: none;
+      border: 1px solid #f0f0f0;
+      color: #f0f0f0;
+      font-size: 13px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 10px 36px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #dismiss-btn:hover {
+      background: #f0f0f0;
+      color: #0f0f0f;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="clock">00:00:00</div>
+
+  <div class="panel">
+    <input type="time" id="time-input" value="07:00" step="60" />
+    <button id="set-btn">Set Alarm</button>
+    <div id="status"></div>
+    <button id="dismiss-btn">Dismiss</button>
+  </div>
+
+  <script>
+    const clockEl    = document.getElementById('clock');
+    const timeInput  = document.getElementById('time-input');
+    const setBtn     = document.getElementById('set-btn');
+    const statusEl   = document.getElementById('status');
+    const dismissBtn = document.getElementById('dismiss-btn');
+
+    let alarmTime  = null;
+    let ringing    = false;
+    let audioCtx   = null;
+    let oscillator = null;
+    let gainNode   = null;
+
+    function pad(n) {
+      return String(n).padStart(2, '0');
+    }
+
+    function tick() {
+      const now = new Date();
+      const h = pad(now.getHours());
+      const m = pad(now.getMinutes());
+      const s = pad(now.getSeconds());
+      clockEl.textContent = `${h}:${m}:${s}`;
+
+      if (alarmTime && !ringing) {
+        const current = `${h}:${m}`;
+        if (current === alarmTime && now.getSeconds() === 0) {
+          triggerAlarm();
+        }
+      }
+    }
+
+    function triggerAlarm() {
+      ringing = true;
+      statusEl.textContent = 'ALARM';
+      statusEl.classList.add('ringing');
+      dismissBtn.style.display = 'block';
+      setBtn.style.display = 'none';
+      timeInput.disabled = true;
+      startSound();
+    }
+
+    function startSound() {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      gainNode = audioCtx.createGain();
+      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gainNode.connect(audioCtx.destination);
+
+      function beep() {
+        if (!ringing) return;
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        osc.connect(gainNode);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2);
+        setTimeout(() => { if (ringing) beep(); }, 700);
+      }
+      beep();
+    }
+
+    function stopSound() {
+      if (audioCtx) {
+        audioCtx.close();
+        audioCtx = null;
+      }
+    }
+
+    function dismissAlarm() {
+      ringing = false;
+      alarmTime = null;
+      stopSound();
+      statusEl.textContent = '';
+      statusEl.classList.remove('ringing');
+      dismissBtn.style.display = 'none';
+      setBtn.style.display = 'block';
+      setBtn.textContent = 'Set Alarm';
+      setBtn.classList.remove('active');
+      timeInput.disabled = false;
+    }
+
+    setBtn.addEventListener('click', () => {
+      if (alarmTime) {
+        alarmTime = null;
+        setBtn.textContent = 'Set Alarm';
+        setBtn.classList.remove('active');
+        statusEl.textContent = '';
+      } else {
+        const val = timeInput.value;
+        if (!val) return;
+        alarmTime = val;
+        setBtn.textContent = 'Cancel';
+        setBtn.classList.add('active');
+        statusEl.textContent = `Set for ${val}`;
+      }
+    });
+
+    dismissBtn.addEventListener('click', dismissAlarm);
+
+    setInterval(tick, 1000);
+    tick();
+  </script>
+</body>
+</html>
